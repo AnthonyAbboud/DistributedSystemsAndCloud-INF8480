@@ -5,19 +5,24 @@ import java.rmi.NotBoundException;
 import java.rmi.RemoteException;
 import java.rmi.registry.LocateRegistry;
 import java.rmi.registry.Registry;
+import java.util.Arrays;
 
 import ca.polymtl.inf8480.tp1.shared.ServerInterface;
 
 public class Client {
 	public static void main(String[] args) {
 		String distantHostname = null;
-
+		int x = 1;
+		
 		if (args.length > 0) {
 			distantHostname = args[0];
 		}
+		if (args.length > 1){
+			x = Integer.parseInt(args[1]);
+		}
 
 		Client client = new Client(distantHostname);
-		client.run();
+		client.test(x);
 	}
 
 	FakeServer localServer = null; // Pour tester la latence d'un appel de
@@ -107,4 +112,46 @@ public class Client {
 			System.out.println("Erreur: " + e.getMessage());
 		}
 	}
+	private void test(int x){
+		
+		char[] chars = new char[10];
+		Arrays.fill(chars, '*');
+		String argument = new String(chars);
+		
+		
+		System.out.println("statististiques pour x = " + x );
+		
+		
+		long start = System.nanoTime();
+		localServer.test(argument);
+		long end = System.nanoTime();
+
+		System.out.println("Temps écoulé appel normal: " + (end - start) + " ns");
+		
+		
+		try {
+			start = System.nanoTime();
+			localServerStub.test(argument);
+			end = System.nanoTime();
+
+			System.out.println("Temps écoulé appel RMI local: " + (end - start)	+ " ns");
+			
+		} catch (RemoteException e) {
+			System.out.println("Erreur: " + e.getMessage());
+		}
+		
+		try {
+			start = System.nanoTime();
+			distantServerStub.test(argument);
+			end = System.nanoTime();
+
+			System.out.println("Temps écoulé appel RMI distant: " + (end - start) + " ns");
+			
+		} catch (RemoteException e) {
+			System.out.println("Erreur: " + e.getMessage());
+		}
+		
+		
+	}
+	
 }

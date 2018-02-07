@@ -49,4 +49,8 @@ public class Server implements ServerInterface {
 	public int execute(int a, int b) throws RemoteException {
 		return a + b;
 	}
+	
+	@Override
+	public void test(String data) throws RemoteException {
+	}
 }

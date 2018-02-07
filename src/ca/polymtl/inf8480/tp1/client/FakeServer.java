@@ -4,4 +4,6 @@ public class FakeServer {
 	int execute(int a, int b) {
 		return a + b;
 	}
+	void test(String data) {
+	}
 }
