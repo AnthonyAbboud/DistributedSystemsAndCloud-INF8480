@@ -13,6 +13,6 @@ public interface ServerInterface extends Remote {
 	public String[][]		syncLocalDirectory() 		throws RemoteException;
 	public String[] 			get(String nom, int checksum)						throws RemoteException;
 	public String[]			lock(String nom, int clientid, int checksum) 	throws RemoteException;
-	public boolean 		push(String nom, int clientid, int checksum) throws RemoteException;
+	public boolean 		push(String nom, String contenu, int clientid) throws RemoteException;
 	
 }

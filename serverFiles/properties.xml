@@ -1,4 +1,9 @@
 <?xml version="1.0" encoding="UTF-8" standalone="no"?>
 <!DOCTYPE properties SYSTEM "http://java.sun.com/dtd/properties.dtd">
 <properties>
+<comment/>
+<entry key="Hello_MD5">0</entry>
+<entry key="Friend_owner">0</entry>
+<entry key="Friend_MD5">0</entry>
+<entry key="Hello_owner">0</entry>
 </properties>

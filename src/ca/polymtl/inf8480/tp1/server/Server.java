@@ -10,6 +10,7 @@ import ca.polymtl.inf8480.tp1.shared.ServerInterface;
 
 import java.util.*;
 import java.io.*;
+import java.nio.file.Files;
 
 public class Server implements ServerInterface {
 
@@ -65,7 +66,8 @@ public class Server implements ServerInterface {
 	}
 	
 	// useful for ID generation
-	private int clientsTotal = 0;
+	// during first session, begins at 1 so 0 is reserved
+	private int clientsTotal = 1;
 	// retains data between sessions, mainly the association <string filename, int as string checksum>
 	private java.util.Properties properties;
 	// directory used to store data
@@ -90,10 +92,14 @@ public class Server implements ServerInterface {
 	*/
 	@Override
 	public int CreateClientID() throws RemoteException{
+		
 		int ID = clientsTotal;
 		clientsTotal += 1;
+		
+		// so we can have a different id each time even if the server closes
 		properties.setProperty("clientsTotal", Integer.toString(clientsTotal));
 		syncProperties();
+		
 		return ID;
 	}
 	
@@ -104,14 +110,23 @@ public class Server implements ServerInterface {
 	*/
 	@Override
 	public boolean create(String nom) throws RemoteException{
-		File f = new File(folder+"/"+nom);
+		
+		// attempts creating the file
+		File f = new File(storage +"/"+nom);
 		try{
 			if( !f.exists() ){
 				f.createNewFile();
+				
+				// some book keeping : the MD5 and current owner of file
+				properties.setProperty(nom + "_MD5", Integer.toString(0));
+				properties.setProperty(nom + "_owner", Integer.toString(0));
+				syncProperties();
+				
 				return true;
 			}
 		}
 		catch(IOException e){	}
+		
 		return false;
 	}
 	
@@ -122,14 +137,28 @@ public class Server implements ServerInterface {
 	*/
 	@Override
 	public String[][] list() throws RemoteException{
-
-		File[] files = new File(storage).listFiles();
-		String[][] result = new String[files.length][1];
 		
+		// we get a liting of files in storage
+		File[] files = new File(storage).listFiles();
+		String[][] result = new String[files.length][];
+		
+		// for each file we add its info to result
 		for (int i=0; i< files.length; i++) {
+			
 			File file = files[i];
-			System.out.println(file.toString());
-			result[i][0] = file.toString();
+			String name = file.getName();
+			String owner = properties.getProperty(name + "_owner");
+			
+			// if there is an owner (clientID != 0) we specify it 
+			if(Integer.parseInt(owner)!=0){
+				// used format is {name [, owner]}
+				result[i] = new String[2];
+				result [i][1] = owner;
+			}
+			else{
+				result[i] = new String[1];
+			}
+			result[i][0] = name;
 		}
 		
 		
@@ -141,11 +170,32 @@ public class Server implements ServerInterface {
 		Permet de récupérer les noms et les contenus de tous les fichiers du serveur.
 		Le client appelle cette fonction pour synchroniser son répertoire local avec celui du serveur.
 		Les fichiers existants seront écrasés et remplacés par les versions du le serveur.
-		- Retourne une liste d'entrees : String nomFichier, String contenu, String checksum -
+		- Retourne une liste d'entrees : String nomFichier, String contenu -
 	*/
 	@Override
 	public String[][] syncLocalDirectory() throws RemoteException{
-		return null;
+		// we get a liting of files in storage
+		File[] files = new File(storage).listFiles();
+		String[][] result = new String[files.length][2];
+		
+		// for each file we add its info to result
+		for (int i=0; i< files.length; i++) {
+			
+			File file = files[i];
+			String name = file.getName();
+			String content= "";
+			try{
+				 content = new String(Files.readAllBytes(file.toPath()), "UTF-8");
+			}
+			catch(Exception e ){
+				System.err.println("Error getting file content in syncLocalDirectory : " + e.getMessage());
+			}
+			
+			result[i][0] = name;
+			result [i][1] = content;
+		}		
+		
+		return result;
 	}
 	
 	/*
@@ -181,7 +231,7 @@ public class Server implements ServerInterface {
 		- Retourne un booleen pour indiquer si reussi. -
 	*/
 	@Override
-	public boolean push(String nom, int clientid, int checksum) throws RemoteException{
+	public boolean push(String nom, String contenu, int clientid) throws RemoteException{
 		return false;
 	}
 	

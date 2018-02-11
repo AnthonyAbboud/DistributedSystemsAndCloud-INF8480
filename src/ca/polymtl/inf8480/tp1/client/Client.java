@@ -26,9 +26,9 @@ public class Client {
 	// retains data between sessions, mainly the association <string filename, int as string checksum>
 	private java.util.Properties properties;
 	// directory used to store data
-	private String folder = "./clientFiles";
+	private String folder = "./clientFiles/";
 	// directory that stores the managed files
-	private String storage = folder + "cloud_storage";
+	private String storage = folder + "cloud_storage/";
 	
 	
 	public Client() {
@@ -67,7 +67,7 @@ public class Client {
 		try{
 			
 			properties = new Properties();
-			properties.loadFromXML(new FileInputStream(folder + "/properties.xml"));
+			properties.loadFromXML(new FileInputStream(folder + "properties.xml"));
 			
 		} catch ( IOException e) {
 			System.err.println("Erreur loading properties : " + e.getMessage());
@@ -79,7 +79,7 @@ public class Client {
 		}
 		else {
 			
-			
+			// check client has a valid ID
 			try {
 				switch(args[0]){
 					
@@ -103,27 +103,49 @@ public class Client {
 					}
 					
 				}
-				
+				// if so we can do what he wants
 				switch(args[0]){
 					
 					case "create":{
+						
 						String nom = args[1];
 						boolean reussi = serverStub.create(nom);
+						
 						if(reussi) System.out.println("a file named \"" + nom + "\" has been added.");
 						else  System.out.println("a file named \"" + nom + "\" already exists.");
+						
 						break;
 					}
 					
 					case "list":
 					{
+						
 						String[][] files = serverStub.list();
+						
+						for(String[] file : files){
+							System.out.print("* " + file[0] + " \t");
+							if(file.length > 1) System.out.println("locked by " + file[1]);
+							else System.out.println("unlocked");
+						}
+						
 						break;
 					}
 					
 					case "sync":
 					case "syncLocalDirectory":
 					{
-						int checksum = Integer.parseInt(args[2]);
+						String[][] files = serverStub.syncLocalDirectory();
+						for(String[] file: files){
+							try {
+								File f = new File(storage + file[0]);
+								FileWriter fw = new FileWriter(f);
+								fw.write(file[1]);
+								fw.flush();
+								fw.close();
+							} catch (IOException e) {
+								System.err.println("Error writing file content in syncLocalDirectory : " + e.getMessage());
+							}
+						}
 						break;
 					}
 					
