@@ -3,7 +3,16 @@ package ca.polymtl.inf8480.tp1.shared;
 import java.rmi.Remote;
 import java.rmi.RemoteException;
 
+import java.util.*;
+
 public interface ServerInterface extends Remote {
-	int execute(int a, int b) throws RemoteException;
-	void test(String data) throws RemoteException;
+	
+	public int					CreateClientID() 				throws RemoteException;
+	public boolean			create(String nom) 			throws RemoteException;
+	public String[][]		list()									throws RemoteException;
+	public String[][]		syncLocalDirectory() 		throws RemoteException;
+	public String[] 			get(String nom, int checksum)						throws RemoteException;
+	public String[]			lock(String nom, int clientid, int checksum) 	throws RemoteException;
+	public boolean 		push(String nom, int clientid, int checksum) throws RemoteException;
+	
 }
