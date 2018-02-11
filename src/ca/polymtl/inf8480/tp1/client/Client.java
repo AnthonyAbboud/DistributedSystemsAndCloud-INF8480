@@ -19,14 +19,17 @@ public class Client {
 		client.run(args);
 	}
 	
+	// the ID used for gonnection
+	private int clientID;
 	// stub we're using for remote calls
 	private ServerInterface serverStub = null;
 	// retains data between sessions, mainly the association <string filename, int as string checksum>
 	private java.util.Properties properties;
 	// directory used to store data
 	private String folder = "./clientFiles";
-	// the ID used for gonnection
-	private int clientID;
+	// directory that stores the managed files
+	private String storage = folder + "cloud_storage";
+	
 	
 	public Client() {
 		super();
@@ -113,14 +116,13 @@ public class Client {
 					
 					case "list":
 					{
-						String nom = args[1];
+						String[][] files = serverStub.list();
 						break;
 					}
 					
 					case "sync":
 					case "syncLocalDirectory":
 					{
-						String nom = args[1];
 						int checksum = Integer.parseInt(args[2]);
 						break;
 					}

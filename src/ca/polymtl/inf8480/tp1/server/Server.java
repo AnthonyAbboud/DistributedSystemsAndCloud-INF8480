@@ -68,8 +68,10 @@ public class Server implements ServerInterface {
 	private int clientsTotal = 0;
 	// retains data between sessions, mainly the association <string filename, int as string checksum>
 	private java.util.Properties properties;
-	//directory used to store data
+	// directory used to store data
 	private String folder = "./serverFiles";
+	// directory that stores the managed files
+	private String storage = folder + "/cloud_storage";
 	
 	private void syncProperties(){
 		try{
@@ -120,7 +122,18 @@ public class Server implements ServerInterface {
 	*/
 	@Override
 	public String[][] list() throws RemoteException{
-		return null;
+
+		File[] files = new File(storage).listFiles();
+		String[][] result = new String[files.length][1];
+		
+		for (int i=0; i< files.length; i++) {
+			File file = files[i];
+			System.out.println(file.toString());
+			result[i][0] = file.toString();
+		}
+		
+		
+		return result;
 	}
 	
 	
