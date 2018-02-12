@@ -11,6 +11,7 @@ import ca.polymtl.inf8480.tp1.shared.ServerInterface;
 import java.util.*;
 import java.io.*;
 import java.nio.file.Files;
+import java.security.MessageDigest;
 
 public class Server implements ServerInterface {
 
@@ -35,8 +36,7 @@ public class Server implements ServerInterface {
 		
 		} catch (ConnectException e) {
 			
-			System.err
-					.println("Impossible de se connecter au registre RMI. Est-ce que rmiregistry est lancé ?");
+			System.err.println("Impossible de se connecter au registre RMI. Est-ce que rmiregistry est lancé ?");
 			System.err.println();
 			System.err.println("Erreur: " + e.getMessage());
 		
@@ -47,7 +47,7 @@ public class Server implements ServerInterface {
 		try{
 			
 			properties = new Properties();
-			properties.loadFromXML(new FileInputStream(folder + "/properties.xml"));
+			properties.load(new FileInputStream(propertiesPath));
 			
 		} catch ( IOException e) {
 			System.err.println("Erreur loading properties : " + e.getMessage());
@@ -71,13 +71,15 @@ public class Server implements ServerInterface {
 	// retains data between sessions, mainly the association <string filename, int as string checksum>
 	private java.util.Properties properties;
 	// directory used to store data
-	private String folder = "./serverFiles";
+	private String folder = "./serverFiles/";
 	// directory that stores the managed files
-	private String storage = folder + "/cloud_storage";
+	private String propertiesPath = folder + "properties.xml";
+	// directory that stores the managed files
+	private String storage = folder + "cloud_storage/";
 	
 	private void syncProperties(){
 		try{
-			properties.storeToXML(new FileOutputStream(folder + "/properties.xml"), "");
+			properties.store(new FileOutputStream(propertiesPath), "");
 		} catch ( IOException e) {
 			System.err.println("Error exporting properties : " + e.getMessage());
 		}
@@ -118,7 +120,7 @@ public class Server implements ServerInterface {
 				f.createNewFile();
 				
 				// some book keeping : the MD5 and current owner of file
-				properties.setProperty(nom + "_MD5", Integer.toString(0));
+				properties.setProperty(nom + "_MD5", Integer.toString(1));
 				properties.setProperty(nom + "_owner", Integer.toString(0));
 				syncProperties();
 				
@@ -176,7 +178,7 @@ public class Server implements ServerInterface {
 	public String[][] syncLocalDirectory() throws RemoteException{
 		// we get a liting of files in storage
 		File[] files = new File(storage).listFiles();
-		String[][] result = new String[files.length][2];
+		String[][] result = new String[files.length][3];
 		
 		// for each file we add its info to result
 		for (int i=0; i< files.length; i++) {
@@ -193,6 +195,7 @@ public class Server implements ServerInterface {
 			
 			result[i][0] = name;
 			result [i][1] = content;
+			result [i][2] = properties.getProperty(name + "_MD5");
 		}		
 		
 		return result;
@@ -207,8 +210,31 @@ public class Server implements ServerInterface {
 		- Retourne un tableau contenant le fichier si besoin : String contenu -
 	*/
 	@Override
-	public String[] get(String nom, int checksum) throws RemoteException{
-		return null;
+	public String[] get(String nom, String checksum) throws RemoteException{
+		
+		String path = storage + nom;
+		File f = new File(path);
+		
+		
+		if(!f.exists()) return new String[0];
+		
+		
+		String md5 = properties.getProperty(nom + "_MD5");
+		
+		if(md5 == checksum && Integer.parseInt(checksum)!=0) return new String[0];
+		
+		System.out.println("has to be dowloaded");
+		
+		String[] content = new String[1];
+		try{
+			 content[0] = new String(Files.readAllBytes(f.toPath()), "UTF-8");
+		}
+		catch(Exception e ){
+			System.err.println("Error getting file content in get : " + e.getMessage());
+		}
+		
+		System.out.println(content[0]);
+		return content;
 	}
 	
 	/*
@@ -216,11 +242,28 @@ public class Server implements ServerInterface {
 		La dernière version du fichier est écrite dans le répertoire local courant ( la somme de contrôle est aussi utilisée pour éviter un transfert inutile).
 		L'opération échoue si le fichier n’existe pas ou il est déjà verrouillé par un autre client.
 		Le client doit recevoir l’ID du client qui détient le verrou.
-		- Retourne le contenu du fichier, : String contenu, int  as String l'ID du client (celui fourni si le lock reussi) -
+		- Retourne un tableau : int  as String l'ID du client (celui fourni si le lock reussi), String contenu si besoin -
 	*/
 	@Override
-	public String[] lock(String nom, int clientid, int checksum) throws RemoteException{
-		return null;
+	public String[] lock(String nom, int clientID, String checksum) throws RemoteException{
+		
+		String[] content = get(nom, Integer.toString(clientID));
+		int owner = Integer.parseInt(properties.getProperty(nom + "_owner"));
+		
+		if(owner == 0) owner = clientID;
+		
+		String[] result;
+		if(content.length != 0){
+			result = new String[2];
+			result[1] = content[0];
+			
+		}
+		else {
+			result = new String[2];
+		}
+		result[0] = Integer.toString(owner);
+		
+		return result;
 	}
 	
 	
@@ -231,7 +274,43 @@ public class Server implements ServerInterface {
 		- Retourne un booleen pour indiquer si reussi. -
 	*/
 	@Override
-	public boolean push(String nom, String contenu, int clientid) throws RemoteException{
+	public boolean push(String nom, String contenu, int clientID) throws RemoteException{
+		
+		
+		System.out.println("push request from " + Integer.toString(clientID) + " on " + nom);
+		
+		File f = new File(storage + nom);
+		
+		
+		if( !f.exists() ) return false;
+		
+		int owner = Integer.parseInt(properties.getProperty(nom + "_owner"));
+		if( owner != clientID ) return false;
+		
+			
+		try {
+			FileWriter fw = new FileWriter(f);
+			fw.write(contenu);
+			fw.flush();
+			fw.close();
+		} catch (IOException e) {
+			System.err.println("Error writing file content in syncLocalDirectory : " + e.getMessage());
+		}
+		
+		String md5 = "";
+		try{
+			md5 = new String(MessageDigest.getInstance("MD5").digest(contenu.getBytes()), "UTF-8");
+		}
+		catch(Exception e){
+			System.err.println("Error in push : " + e.getMessage());
+		}
+		
+		properties.setProperty(nom + "_MD5", md5);
+		properties.setProperty(nom + "_owner", Integer.toString(0));
+		
+		syncProperties();
+		
+
 		return false;
 	}
 	
