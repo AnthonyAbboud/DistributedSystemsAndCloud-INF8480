@@ -7,11 +7,13 @@ import java.rmi.registry.Registry;
 import java.rmi.server.UnicastRemoteObject;
 
 import ca.polymtl.inf8480.tp1.shared.ServerInterface;
+import ca.polymtl.inf8480.tp1.shared.CloudUtil;
 
 import java.util.*;
 import java.io.*;
 import java.nio.file.Files;
 import java.security.MessageDigest;
+
 
 public class Server implements ServerInterface {
 
@@ -44,17 +46,11 @@ public class Server implements ServerInterface {
 			System.err.println("Erreur: " + e.getMessage());
 		}
 		
-		try{
-			
-			properties = new Properties();
-			properties.load(new FileInputStream(propertiesPath));
-			
-		} catch ( IOException e) {
-			System.err.println("Erreur loading properties : " + e.getMessage());
-		}
+		util = new CloudUtil("./serverFiles/");
+		
 		
 		try{
-			clientsTotal =  Integer.parseInt( properties.getProperty("clientsTotal"));
+			clientsTotal =  Integer.parseInt( util.properties.getProperty("clientsTotal"));
 		}
 		catch(NumberFormatException e){}
 		catch(NullPointerException e){}
@@ -69,22 +65,8 @@ public class Server implements ServerInterface {
 	// during first session, begins at 1 so 0 is reserved
 	private int clientsTotal = 1;
 	// retains data between sessions, mainly the association <string filename, int as string checksum>
-	private java.util.Properties properties;
-	// directory used to store data
-	private String folder = "./serverFiles/";
-	// directory that stores the managed files
-	private String propertiesPath = folder + "properties.xml";
-	// directory that stores the managed files
-	private String storage = folder + "cloud_storage/";
-	
-	private void syncProperties(){
-		try{
-			properties.store(new FileOutputStream(propertiesPath), "");
-		} catch ( IOException e) {
-			System.err.println("Error exporting properties : " + e.getMessage());
-		}
-	}
-	
+	private CloudUtil util;
+
 	
 	/*
 		Génère un identifiant unique pour le client.
@@ -99,8 +81,8 @@ public class Server implements ServerInterface {
 		clientsTotal += 1;
 		
 		// so we can have a different id each time even if the server closes
-		properties.setProperty("clientsTotal", Integer.toString(clientsTotal));
-		syncProperties();
+		util.properties.setProperty("clientsTotal", Integer.toString(clientsTotal));
+		util.syncProperties();
 		
 		return ID;
 	}
@@ -114,20 +96,13 @@ public class Server implements ServerInterface {
 	public boolean create(String nom) throws RemoteException{
 		
 		// attempts creating the file
-		File f = new File(storage +"/"+nom);
 		try{
-			if( !f.exists() ){
-				f.createNewFile();
-				
-				// some book keeping : the MD5 and current owner of file
-				properties.setProperty(nom + "_MD5", Integer.toString(1));
-				properties.setProperty(nom + "_owner", Integer.toString(0));
-				syncProperties();
-				
-				return true;
-			}
+			util.writeFile(nom,"");
+			util.setFileOwner(nom, 0);
+			util.syncProperties();
+			return true;
 		}
-		catch(IOException e){	}
+		catch(Exception e){}
 		
 		return false;
 	}
@@ -141,7 +116,7 @@ public class Server implements ServerInterface {
 	public String[][] list() throws RemoteException{
 		
 		// we get a liting of files in storage
-		File[] files = new File(storage).listFiles();
+		File[] files = new File(util.storage).listFiles();
 		String[][] result = new String[files.length][];
 		
 		// for each file we add its info to result
@@ -149,7 +124,7 @@ public class Server implements ServerInterface {
 			
 			File file = files[i];
 			String name = file.getName();
-			String owner = properties.getProperty(name + "_owner");
+			String owner = Integer.toString(util.getFileOwner(name));
 			
 			// if there is an owner (clientID != 0) we specify it 
 			if(Integer.parseInt(owner)!=0){
@@ -177,7 +152,7 @@ public class Server implements ServerInterface {
 	@Override
 	public String[][] syncLocalDirectory() throws RemoteException{
 		// we get a liting of files in storage
-		File[] files = new File(storage).listFiles();
+		File[] files = new File(util.storage).listFiles();
 		String[][] result = new String[files.length][3];
 		
 		// for each file we add its info to result
@@ -185,17 +160,11 @@ public class Server implements ServerInterface {
 			
 			File file = files[i];
 			String name = file.getName();
-			String content= "";
-			try{
-				 content = new String(Files.readAllBytes(file.toPath()), "UTF-8");
-			}
-			catch(Exception e ){
-				System.err.println("Error getting file content in syncLocalDirectory : " + e.getMessage());
-			}
+			String content= util.readFile(name);
 			
 			result[i][0] = name;
 			result [i][1] = content;
-			result [i][2] = properties.getProperty(name + "_MD5");
+			result [i][2] =Integer.toString(util.getFileOwner(name));
 		}		
 		
 		return result;
@@ -212,28 +181,25 @@ public class Server implements ServerInterface {
 	@Override
 	public String[] get(String nom, String checksum) throws RemoteException{
 		
-		String path = storage + nom;
+		String path = util.storage + nom;
 		File f = new File(path);
 		
 		
 		if(!f.exists()) return new String[0];
 		
 		
-		String md5 = properties.getProperty(nom + "_MD5");
+		String md5 = util.getFileChecksum(nom);
 		
 		if(md5 == checksum && Integer.parseInt(checksum)!=0) return new String[0];
 		
 		System.out.println("has to be dowloaded");
 		
 		String[] content = new String[1];
-		try{
-			 content[0] = new String(Files.readAllBytes(f.toPath()), "UTF-8");
-		}
-		catch(Exception e ){
-			System.err.println("Error getting file content in get : " + e.getMessage());
-		}
+		
+		content[0] = util.readFile(nom);
 		
 		System.out.println(content[0]);
+		
 		return content;
 	}
 	
@@ -248,7 +214,7 @@ public class Server implements ServerInterface {
 	public String[] lock(String nom, int clientID, String checksum) throws RemoteException{
 		
 		String[] content = get(nom, Integer.toString(clientID));
-		int owner = Integer.parseInt(properties.getProperty(nom + "_owner"));
+		int owner = util.getFileOwner(nom);
 		
 		if(owner == 0) owner = clientID;
 		
@@ -256,10 +222,9 @@ public class Server implements ServerInterface {
 		if(content.length != 0){
 			result = new String[2];
 			result[1] = content[0];
-			
 		}
 		else {
-			result = new String[2];
+			result = new String[1];
 		}
 		result[0] = Integer.toString(owner);
 		
@@ -279,36 +244,19 @@ public class Server implements ServerInterface {
 		
 		System.out.println("push request from " + Integer.toString(clientID) + " on " + nom);
 		
-		File f = new File(storage + nom);
+		File f = new File(util.storage + nom);
 		
 		
 		if( !f.exists() ) return false;
 		
-		int owner = Integer.parseInt(properties.getProperty(nom + "_owner"));
+		int owner = util.getFileOwner(nom);
 		if( owner != clientID ) return false;
 		
-			
-		try {
-			FileWriter fw = new FileWriter(f);
-			fw.write(contenu);
-			fw.flush();
-			fw.close();
-		} catch (IOException e) {
-			System.err.println("Error writing file content in syncLocalDirectory : " + e.getMessage());
-		}
+		util.writeFile(nom, contenu);
 		
-		String md5 = "";
-		try{
-			md5 = new String(MessageDigest.getInstance("MD5").digest(contenu.getBytes()), "UTF-8");
-		}
-		catch(Exception e){
-			System.err.println("Error in push : " + e.getMessage());
-		}
+		util.setFileOwner(nom, 0);
 		
-		properties.setProperty(nom + "_MD5", md5);
-		properties.setProperty(nom + "_owner", Integer.toString(0));
-		
-		syncProperties();
+		util.syncProperties();
 		
 
 		return false;

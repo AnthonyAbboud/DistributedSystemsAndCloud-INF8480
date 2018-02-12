@@ -12,6 +12,7 @@ import java.nio.file.Files;
 import java.security.MessageDigest;
 
 import ca.polymtl.inf8480.tp1.shared.ServerInterface;
+import ca.polymtl.inf8480.tp1.shared.CloudUtil;
 
 public class Client {
 	
@@ -26,13 +27,7 @@ public class Client {
 	// stub we're using for remote calls
 	private ServerInterface serverStub = null;
 	// retains data between sessions, mainly the association <string filename, int as string checksum>
-	private java.util.Properties properties;
-	// directory used to store data
-	private String folder = "./clientFiles/";
-	// directory that stores the managed files
-	private String propertiesPath = folder + "properties.xml";
-	// directory that stores the managed files
-	private String storage = folder + "cloud_storage/";
+	private CloudUtil util;
 	
 	
 	public Client() {
@@ -58,14 +53,6 @@ public class Client {
 		return stub;
 	}
 	
-	private void syncProperties(){
-		try{
-			properties.store(new FileOutputStream(propertiesPath), "");
-		} catch ( IOException e) {
-			System.err.println("Error exporting properties : " + e.getMessage());
-		}
-	}
-	
 	
 	public void run(String[] args){
 		
@@ -76,24 +63,8 @@ public class Client {
 		
 		serverStub = loadServerStub("127.0.0.1");
 		
-		// load server properties like number of slients, file checksums, ..
-		try{
-			properties = new Properties();
-			properties.load(new FileInputStream(propertiesPath));
-		} catch ( IOException e) {
-			System.err.println("Erreur loading properties : " + e.getMessage());
-			
-			File file = new File(propertiesPath);
-			String content= "";
-			try{
-				 content = new String(Files.readAllBytes(file.toPath()), "UTF-8");
-			}
-			catch(Exception e2 ){}
-			
-			System.err.println(content);
-			
-			return;
-		}
+		// see CloudUtil in shared folder
+		util = new CloudUtil("./clientFiles/");
 		
 		
 		if (args.length == 0) {
@@ -112,17 +83,17 @@ public class Client {
 					case "createClientID":
 					case "CreateClientID":{
 						clientID = serverStub.CreateClientID();
-						properties.setProperty("clientID", Integer.toString(clientID));
-						syncProperties();
+						util.properties.setProperty("clientID", Integer.toString(clientID));
+						util.syncProperties();
 						return;
 					}
 					default:{
 						try{
-							clientID =  Integer.parseInt( properties.getProperty("clientID"));
+							clientID =  Integer.parseInt( util.properties.getProperty("clientID"));
 						}
 						catch(Exception e){
 							System.out.println("you need to call createClientId() first.");
-							System.out.println(e.getMessage());
+							//System.out.println(e.getMessage());
 							return;
 						}
 					}
@@ -166,16 +137,8 @@ public class Client {
 				{
 					String[][] files = serverStub.syncLocalDirectory();
 					for(String[] file: files){
-						try {
-							File f = new File(storage + file[0]);
-							FileWriter fw = new FileWriter(f);
-							fw.write(file[1]);
-							fw.flush();
-							fw.close();
-						} catch (IOException e) {
-							System.err.println("Error writing file content in syncLocalDirectory : " + e.getMessage());
-						}
-						properties.setProperty(file[0] + "_MD5", file[2]);
+						util.writeFile(file[0], file[1]);
+						util.setFileChecksum(file[0], file[2]);
 					}
 					break;
 				}
@@ -189,33 +152,18 @@ public class Client {
 					String nom = args[1];
 					String checksum;
 					try{
-						checksum = properties.getProperty(nom+"_MD5");
+						checksum = util.getFileChecksum(nom);
 					}
 					catch(Exception e){
 						checksum = "0";
 					}
 					
 					String[] content = serverStub.get(nom, checksum);
+					
 					if(content.length != 0){
-						try {
-							File f = new File(storage + nom);
-							FileWriter fw = new FileWriter(f);
-							fw.write(content[0]);
-							fw.flush();
-							fw.close();
-						} catch (IOException e) {
-							System.err.println("Error writing file content in get : " + e.getMessage());
-						}
 						
-						String md5 = "";
-						try{
-							md5 = new String(MessageDigest.getInstance("MD5").digest(content[0].getBytes()), "UTF-8");
-						}
-						catch(Exception e){
-							System.err.println("Error in get : " + e.getMessage());
-						}
-						
-						properties.setProperty(nom + "_MD5", md5);
+						util.writeFile(nom, content[0]);
+						util.setFileChecksum(nom, util.checksum(content[0]));		
 						
 						System.out.println(nom + " received");
 					}
@@ -232,9 +180,9 @@ public class Client {
 					}
 					String nom = args[1];
 					
-					String checksum = "";
+					String checksum;
 					try{
-						checksum = properties.getProperty(nom+"_MD5");
+						checksum = util.getFileChecksum(nom);
 					}
 					catch(Exception e){
 						checksum = "0";
@@ -242,25 +190,11 @@ public class Client {
 					
 					String[] content = serverStub.lock(nom, clientID, checksum);
 					if(content.length != 1){
-						try {
-							File f = new File(storage + nom);
-							FileWriter fw = new FileWriter(f);
-							fw.write(content[1]);
-							fw.flush();
-							fw.close();
-						} catch (IOException e) {
-							System.err.println("Error writing file content in lock : " + e.getMessage());
-						}
+
+						util.writeFile(nom, content[1]);
+						util.setFileChecksum(nom, util.checksum(content[1]));		
 						
-						String md5 = "";
-						try{
-							md5 = new String(MessageDigest.getInstance("MD5").digest(content[1].getBytes()), "UTF-8");
-						}
-						catch(Exception e){
-							System.err.println("Error in lock : " + e.getMessage());
-						}
-						
-						properties.setProperty(nom + "_MD5", md5);
+						System.out.println(nom + " received");
 					}
 					
 					int owner = Integer.parseInt(content[0]);
@@ -279,27 +213,10 @@ public class Client {
 					}
 					String nom = args[1];
 					
-					File file = new File(storage + nom);
-					byte[] content = new byte[0];
-					String contentString = "";
-					String MD5String = "";
+					String content = util.readFile(nom);
 					
-					try{
-						
-						content = Files.readAllBytes(file.toPath());
-						byte[] checksum = MessageDigest.getInstance("MD5").digest(content);
-						
-						contentString = new String(content, "UTF-8");
-						MD5String = new String(checksum, "UTF-8");
-						
-					}
-					catch(Exception e){
-						System.err.println("Error in push : " + e.getMessage());
-					}
+					boolean reussi = serverStub.push(nom, content, clientID);
 					
-					properties.setProperty(nom + "_MD5", MD5String);
-					
-					boolean reussi = serverStub.push(nom, contentString, clientID);
 					if(reussi) System.out.println("your changes have been pushed.");
 					else  System.out.println("push failed.\n you either do not own the file (use the lock command)\n or it does not exist yet (use the create command).");
 					
@@ -315,7 +232,7 @@ public class Client {
 			System.err.println("Erreur: " + e.getMessage());
 		}
 		
-		syncProperties();
+		util.syncProperties();
 		
 	}		
 		
