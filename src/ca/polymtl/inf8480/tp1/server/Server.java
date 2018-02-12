@@ -44,6 +44,9 @@ public class Server implements ServerInterface {
 			System.err.println("Erreur: " + e.getMessage());
 		}
 		
+		// the instance of CloudUtil, in charge of keeping file state
+		// and providing lower level functionnalities
+		// see CloudUtil in shared folder
 		util = new CloudUtil("./serverFiles/");
 		
 		
@@ -75,6 +78,7 @@ public class Server implements ServerInterface {
 	@Override
 	public int CreateClientID() throws RemoteException{
 		
+		// the client ID is based on the number of clients (so no one gets the same)
 		int ID = clientsTotal;
 		clientsTotal += 1;
 		
@@ -97,6 +101,7 @@ public class Server implements ServerInterface {
 		if(util.exists(nom)) return false;
 		
 		try{
+			// makes an empty file with no owner
 			util.writeFile(nom,"");
 			util.setFileOwner(nom, 0);
 			util.syncProperties();
@@ -119,9 +124,10 @@ public class Server implements ServerInterface {
 		File[] files = new File(util.storage).listFiles();
 		String[][] result = new String[files.length][];
 		
-		// for each file we add its info to result
+		// for each file 
 		for (int i=0; i< files.length; i++) {
 			
+			// we get its name and owner
 			File file = files[i];
 			String name = file.getName();
 			String owner = Integer.toString(util.getFileOwner(name));
@@ -154,9 +160,9 @@ public class Server implements ServerInterface {
 		
 		// we get a listing of files in storage
 		File[] files = new File(util.storage).listFiles();
-		String[][] result = new String[files.length][3];
+		String[][] result = new String[files.length][2];
 		
-		// for each file we add its info to result
+		// for each file we send its info
 		for (int i=0; i< files.length; i++) {
 			
 			File file = files[i];
@@ -165,7 +171,6 @@ public class Server implements ServerInterface {
 			
 			result[i][0] = name;
 			result [i][1] = content;
-			result [i][2] =Integer.toString(util.getFileOwner(name));
 		}		
 		
 		return result;
@@ -183,26 +188,25 @@ public class Server implements ServerInterface {
 	public String[] get(String nom, String checksum) throws RemoteException{
 		
 		
-		
+		// a file that doen't exist can't be sent
 		if(!util.exists(nom)) return new String[0];
 		
+		// we find the file's current checksum
 		String md5 = util.getFileChecksum(nom);
 		
-		
+		// here it's a bit of a hack but the logical flow is correct
 		try{
-			if(Integer.parseInt(checksum)!=0) return new String[0];
+			// if the checksum is zero we have to send it
+			if(Integer.parseInt(checksum)!=0 && !md5.equals(checksum)) return new String[0];
 		}
 		catch(Exception e){
+			// if the checksum isn't the right one it fails
 			if(md5.equals(checksum)) return new String[0];
 		}
 		
-		System.out.println("has to be dowloaded");
-		
+		// we send the file
 		String[] content = new String[1];
-		
 		content[0] = util.readFile(nom);
-		
-		System.out.println(content[0]);
 		
 		return content;
 	}
@@ -217,13 +221,15 @@ public class Server implements ServerInterface {
 	@Override
 	public String[] lock(String nom, int clientID, String checksum) throws RemoteException{
 		
-		
+		// the same logic for getting the file is used, so let's use it
 		String[] content = get(nom, checksum);
 		
+		// if there is no owner (owner==0)
 		int owner = 0;
 		try{
 			owner = util.getFileOwner(nom);
 			if(owner == 0){
+				// then we change the owner
 				owner = clientID;
 				util.setFileOwner(nom, owner);
 				util.syncProperties();
@@ -232,6 +238,7 @@ public class Server implements ServerInterface {
 			System.err.println("Error retrieving file owner : " + e.getMessage());
 		}
 		
+		// we send the file content if needed
 		String[] result;
 		if(content.length != 0){
 			result = new String[2];
@@ -240,6 +247,7 @@ public class Server implements ServerInterface {
 		else {
 			result = new String[1];
 		}
+		// and the current owner
 		result[0] = Integer.toString(owner);
 		
 		return result;
@@ -255,27 +263,25 @@ public class Server implements ServerInterface {
 	@Override
 	public boolean push(String nom, String contenu, int clientID) throws RemoteException{
 		
-		
-		System.out.println("push request from " + Integer.toString(clientID) + " on " + nom);
-		
-		
+		// a file that doen't exist can't be pushed yet
 		if(!util.exists(nom)) return false;
 		
+		// get the owner
 		int owner = 0;
 		try{
 			owner = util.getFileOwner(nom);
-		} catch( Exception e){}
+		} catch( Exception e){
+			System.err.println("Error retrieving file owner : " + e.getMessage());
+		}
 		
-		
+		// if youre not the owner, get lost
 		if( owner != clientID ) return false;
 		
+		//otherwise we write the content and clear the lock
 		util.writeFile(nom, contenu);
-		
 		util.setFileOwner(nom, 0);
-		
 		util.syncProperties();
 		
-
 		return true;
 	}
 	

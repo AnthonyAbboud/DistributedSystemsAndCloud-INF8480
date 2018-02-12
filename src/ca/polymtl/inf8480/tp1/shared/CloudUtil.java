@@ -98,6 +98,8 @@ public class CloudUtil{
 		return properties.getProperty(name + "_MD5");	
 	}
 	
+	
+	// reads a file, and sets the checksum
 	public String readFile(String name){
 		
 		File file = new File(storage + name);
@@ -121,7 +123,7 @@ public class CloudUtil{
 	}
 	
 	
-	// write String in file
+	// write String in file, and sets the checksum 
 	public void writeFile(String name, String content){
 		try {
 			File f = new File(storage + name);
