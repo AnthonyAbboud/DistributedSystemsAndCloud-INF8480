@@ -149,7 +149,8 @@ public class Server implements ServerInterface {
 	*/
 	@Override
 	public String[][] syncLocalDirectory() throws RemoteException{
-		// we get a liting of files in storage
+		
+		// we get a listing of files in storage
 		File[] files = new File(util.storage).listFiles();
 		String[][] result = new String[files.length][3];
 		
@@ -179,12 +180,8 @@ public class Server implements ServerInterface {
 	@Override
 	public String[] get(String nom, String checksum) throws RemoteException{
 		
-		String path = util.storage + nom;
-		File f = new File(path);
 		
-		
-		if(!f.exists()) return new String[0];
-		
+		if(!util.exists(nom)) return new String[0];
 		
 		String md5 = util.getFileChecksum(nom);
 		
@@ -245,7 +242,7 @@ public class Server implements ServerInterface {
 		File f = new File(util.storage + nom);
 		
 		
-		if( !f.exists() ) return false;
+		if(!util.exists(nom)) return false;
 		
 		int owner = util.getFileOwner(nom);
 		if( owner != clientID ) return false;

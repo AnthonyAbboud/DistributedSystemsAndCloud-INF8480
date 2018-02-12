@@ -45,7 +45,12 @@ public class CloudUtil{
 		}
 	}
 	
-	
+	// does file exists ?
+	public boolean exists(String name){
+		String path = storage + name;
+		File f = new File(path);
+		return f.exists();
+	}
 	
 	// file ownership functions
 	public void setFileOwner(String name, int clientID){
@@ -55,6 +60,8 @@ public class CloudUtil{
 		return Integer.parseInt(properties.getProperty(name + "_owner"));
 	}
 	
+	
+	// file checksums
 	public void setFileChecksum(String name, byte[] checksum){
 		try{			
 			String MD5String = new String(checksum, "UTF-8");
@@ -73,6 +80,7 @@ public class CloudUtil{
 	public static byte[] checksum(String content){
 		return checksum(content.getBytes());
 	}
+	
 	public static byte[] checksum(byte[] content){
 		byte[] checksum = new byte[0];
 		try{
@@ -99,9 +107,9 @@ public class CloudUtil{
 		try{
 			
 			content = Files.readAllBytes(file.toPath());
-			byte[] checksum = MessageDigest.getInstance("MD5").digest(content);
 			contentString = new String(content, "UTF-8");
 			
+			byte[] checksum = MessageDigest.getInstance("MD5").digest(content);
 			setFileChecksum(name, checksum);
 			
 		}
