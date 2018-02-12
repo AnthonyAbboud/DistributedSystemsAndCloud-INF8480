@@ -78,8 +78,10 @@ public class Client {
 					case "createClientID":
 					case "CreateClientID":{
 						clientID = serverStub.CreateClientID();
-						util.properties.setProperty("clientID", Integer.toString(clientID));
+						String stringID = Integer.toString(clientID);
+						util.properties.setProperty("clientID", stringID);
 						util.syncProperties();
+						System.out.println("received id : " + stringID);
 						return;
 					}
 					default:{
@@ -156,10 +158,7 @@ public class Client {
 					String[] content = serverStub.get(nom, checksum);
 					
 					if(content.length != 0){
-						
-						util.writeFile(nom, content[0]);
-						util.setFileChecksum(nom, util.checksum(content[0]));		
-						
+						util.writeFile(nom, content[0]);	
 						System.out.println(nom + " received");
 					}
 					else System.out.println("no file received");
@@ -184,17 +183,16 @@ public class Client {
 					}
 					
 					String[] content = serverStub.lock(nom, clientID, checksum);
+					
 					if(content.length != 1){
-
 						util.writeFile(nom, content[1]);
-						util.setFileChecksum(nom, util.checksum(content[1]));		
-						
 						System.out.println(nom + " received");
 					}
 					
 					int owner = Integer.parseInt(content[0]);
 					
 					if(owner == clientID) System.out.println("lock on " + nom + " aquired.");
+					else if(owner == 0) System.out.println(nom + " does not exist.");
 					else System.out.println(nom + " is locked by " + content[0]);
 					
 					break;
@@ -213,7 +211,7 @@ public class Client {
 					boolean reussi = serverStub.push(nom, content, clientID);
 					
 					if(reussi) System.out.println("your changes have been pushed.");
-					else  System.out.println("push failed.\n you either do not own the file (use the lock command)\n or it does not exist yet (use the create command).");
+					else  System.out.println("push failed.\n you either do not own the file (try the lock command)\n or it does not exist yet (use the create command).");
 					
 					break;
 				}	

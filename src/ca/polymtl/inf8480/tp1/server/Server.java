@@ -94,6 +94,8 @@ public class Server implements ServerInterface {
 	public boolean create(String nom) throws RemoteException{
 		
 		// attempts creating the file
+		if(util.exists(nom)) return false;
+		
 		try{
 			util.writeFile(nom,"");
 			util.setFileOwner(nom, 0);
@@ -181,11 +183,18 @@ public class Server implements ServerInterface {
 	public String[] get(String nom, String checksum) throws RemoteException{
 		
 		
+		
 		if(!util.exists(nom)) return new String[0];
 		
 		String md5 = util.getFileChecksum(nom);
 		
-		if(md5 == checksum && Integer.parseInt(checksum)!=0) return new String[0];
+		
+		try{
+			if(Integer.parseInt(checksum)!=0) return new String[0];
+		}
+		catch(Exception e){
+			if(md5.equals(checksum)) return new String[0];
+		}
 		
 		System.out.println("has to be dowloaded");
 		
@@ -208,10 +217,20 @@ public class Server implements ServerInterface {
 	@Override
 	public String[] lock(String nom, int clientID, String checksum) throws RemoteException{
 		
-		String[] content = get(nom, Integer.toString(clientID));
-		int owner = util.getFileOwner(nom);
 		
-		if(owner == 0) owner = clientID;
+		String[] content = get(nom, checksum);
+		
+		int owner = 0;
+		try{
+			owner = util.getFileOwner(nom);
+			if(owner == 0){
+				owner = clientID;
+				util.setFileOwner(nom, owner);
+				util.syncProperties();
+			}
+		} catch( Exception e){
+			System.err.println("Error retrieving file owner : " + e.getMessage());
+		}
 		
 		String[] result;
 		if(content.length != 0){
@@ -239,12 +258,15 @@ public class Server implements ServerInterface {
 		
 		System.out.println("push request from " + Integer.toString(clientID) + " on " + nom);
 		
-		File f = new File(util.storage + nom);
-		
 		
 		if(!util.exists(nom)) return false;
 		
-		int owner = util.getFileOwner(nom);
+		int owner = 0;
+		try{
+			owner = util.getFileOwner(nom);
+		} catch( Exception e){}
+		
+		
 		if( owner != clientID ) return false;
 		
 		util.writeFile(nom, contenu);
@@ -254,7 +276,7 @@ public class Server implements ServerInterface {
 		util.syncProperties();
 		
 
-		return false;
+		return true;
 	}
 	
 	
