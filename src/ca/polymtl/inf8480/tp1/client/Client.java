@@ -6,11 +6,6 @@ import java.rmi.RemoteException;
 import java.rmi.registry.LocateRegistry;
 import java.rmi.registry.Registry;
 
-import java.util.*;
-import java.io.*;
-import java.nio.file.Files;
-import java.security.MessageDigest;
-
 import ca.polymtl.inf8480.tp1.shared.ServerInterface;
 import ca.polymtl.inf8480.tp1.shared.CloudUtil;
 

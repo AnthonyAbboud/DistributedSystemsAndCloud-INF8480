@@ -6,13 +6,11 @@ import java.rmi.registry.LocateRegistry;
 import java.rmi.registry.Registry;
 import java.rmi.server.UnicastRemoteObject;
 
+
+import java.io.*;
 import ca.polymtl.inf8480.tp1.shared.ServerInterface;
 import ca.polymtl.inf8480.tp1.shared.CloudUtil;
 
-import java.util.*;
-import java.io.*;
-import java.nio.file.Files;
-import java.security.MessageDigest;
 
 
 public class Server implements ServerInterface {
