@@ -1,0 +1,1 @@
+java -cp ./LDAP.jar:./LDAPinterface.jar -Djava.rmi.server.codebase=file:./LDAPinterface.jar -Djava.security.policy=./policy  tp2.LDAP $*

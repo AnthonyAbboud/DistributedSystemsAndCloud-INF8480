@@ -1,0 +1,1 @@
+java -cp ./server.jar:./ServerInterface.jar  -Djava.rmi.server.codebase=file:./ServerInterface.jar -Djava.security.policy=./policy  tp2.Server $*

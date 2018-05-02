@@ -1,0 +1,29 @@
+#
+# This is a hello world HOT template just defining a single compute
+# server.
+#
+heat_template_version: 2013-05-23
+
+description: >
+  Hello world HOT template that just defines a single server.
+  Contains just base features to verify base HOT support.
+
+resources:
+  server:
+    type: OS::Nova::Server
+    properties:
+      name: server
+      networks:
+      - network: inf4410-net
+      key_name: "cloud"
+      image: "INF4410-Ubuntu-trusty-mini"
+      flavor: "INF4410-mini"
+      admin_user: "testUser"
+      admin_pass: "Password"
+      user_data_format: RAW
+      user_data: |
+            #!/bin/bash
+            wget https://raw.githubusercontent.com/houssemmh/INF4410-TP3/master/server.py
+            python ./server.py
+
+outputs:
